@@ -1,5 +1,5 @@
 {
-  "outputDirectory": "packages/trader/dist/trader",
+  "outputDirectory": "packages/core/dist",
   "rewrites": [
     {
       "source": "/(.*)",
