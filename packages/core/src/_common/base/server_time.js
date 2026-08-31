@@ -1,5 +1,6 @@
 const moment = require('moment');
-const BinarySocket = require('./socket_base');
+const _socket_mod = require('./socket_base');
+const BinarySocket = _socket_mod && _socket_mod.default ? _socket_mod.default : _socket_mod;
 const PromiseUtils = require('@deriv-com/utils').PromiseUtils;
 
 const ServerTime = (() => {
