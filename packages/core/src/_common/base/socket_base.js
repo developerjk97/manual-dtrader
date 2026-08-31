@@ -3,14 +3,8 @@ import { getAccountType, cloneObject, State, getApiV4BaseUrl } from '@deriv/shar
 import SocketCache from './socket_cache';
 import APIMiddleware from './api_middleware';
 
-/*
- * An abstraction layer over native javascript WebSocket,
- * which provides additional functionality like
- * reopen the closed connection and process the buffered requests
- */
 const BinarySocketBase = (() => {
     let deriv_api, binary_socket, client_store;
-
     let config = {};
     let is_disconnect_called = false;
     let is_connected_before = false;
@@ -38,21 +32,14 @@ const BinarySocketBase = (() => {
     };
 
     const getSocketUrl = (is_mock_server = false) => {
-        if (is_mock_server) {
-            return 'ws://127.0.0.1:42069';
-        }
+        if (is_mock_server) return 'ws://127.0.0.1:42069';
         return configured_ws_url ?? getPublicWSUrl();
     };
 
     const isReady = () => hasReadyState(1);
-
     const isClose = () => !binary_socket || hasReadyState(2, 3);
-
     const blockRequest = value => deriv_api?.blockRequest(value);
-
-    const close = () => {
-        if (binary_socket) binary_socket.close();
-    };
+    const close = () => { if (binary_socket) binary_socket.close(); };
 
     const closeAndOpenNewConnection = () => {
         if (binary_socket) {
@@ -64,7 +51,6 @@ const BinarySocketBase = (() => {
 
     const handleAccountTypeChange = new_account_type => {
         const current_account_type = getAccountType();
-
         if (current_account_type !== new_account_type) {
             localStorage.setItem('account_type', new_account_type);
             closeAndOpenNewConnection();
@@ -84,10 +70,7 @@ const BinarySocketBase = (() => {
         const mock_server_config = localStorage.getItem('mock_server_data');
         return mock_server_config
             ? JSON.parse(mock_server_config)
-            : {
-                  session_id: '',
-                  is_mockserver_enabled: false,
-              };
+            : { session_id: '', is_mockserver_enabled: false };
     };
 
     const openNewConnection = () => {
@@ -103,7 +86,6 @@ const BinarySocketBase = (() => {
             binary_socket.addEventListener('error', error_event => {
                 console.error('WebSocket error:', error_event);
                 reconnect_attempt_count++;
-
                 if (reconnect_attempt_count >= 3 && typeof config.onConnectionError === 'function') {
                     config.onConnectionError(error_event);
                     reconnect_attempt_count = 0;
@@ -127,44 +109,28 @@ const BinarySocketBase = (() => {
                 if (client_store && !is_connected_before) {
                     client_store.setIsAuthorize(false);
                 }
-
                 subscribeBalance();
-
                 if (is_connected_before && reconnect_handlers.length > 0) {
                     reconnect_handlers.forEach(handler => {
-                        if (typeof handler === 'function') {
-                            handler();
-                        }
+                        if (typeof handler === 'function') handler();
                     });
                 }
             }
 
-            if (typeof config.onOpen === 'function') {
-                config.onOpen(isReady());
-            }
-
-            if (!is_connected_before) {
-                is_connected_before = true;
-            }
+            if (typeof config.onOpen === 'function') config.onOpen(isReady());
+            if (!is_connected_before) is_connected_before = true;
         });
 
         deriv_api.onMessage().subscribe(({ data: response }) => {
             const msg_type = response.msg_type;
             State.set(['response', msg_type], cloneObject(response));
-
             config.wsEvent('message');
-
-            if (typeof config.onMessage === 'function') {
-                config.onMessage(response);
-            }
+            if (typeof config.onMessage === 'function') config.onMessage(response);
         });
 
         deriv_api.onClose().subscribe(() => {
-            if (!is_switching_socket) {
-                config.wsEvent('close');
-            } else {
-                is_switching_socket = false;
-            }
+            if (!is_switching_socket) config.wsEvent('close');
+            else is_switching_socket = false;
 
             if (typeof config.onDisconnect === 'function' && !is_disconnect_called) {
                 config.onDisconnect();
@@ -173,22 +139,15 @@ const BinarySocketBase = (() => {
         });
     };
 
-    const isSiteUp = status => /^up$/i.test(status);
-    const isSiteUpdating = status => /^updating$/i.test(status);
-    const isSiteDown = status => /^down$/i.test(status);
-
     const setAvailability = status => {
-        availability.is_up = isSiteUp(status);
-        availability.is_updating = isSiteUpdating(status);
-        availability.is_down = isSiteDown(status);
+        availability.is_up = /^up$/i.test(status);
+        availability.is_updating = /^updating$/i.test(status);
+        availability.is_down = /^down$/i.test(status);
     };
 
     const excludeAuthorize = type => !(type === 'authorize' && !client_store.is_logged_in);
-
     const wait = (...responses) => deriv_api?.expectResponse(...responses.filter(excludeAuthorize));
-
     const subscribe = (request, cb) => deriv_api.subscribe(request).subscribe(cb, cb);
-
     const subscribeBalance = cb => subscribe({ balance: 1 }, cb);
     const subscribeProposal = (req, cb) => subscribe({ proposal: 1, ...req }, cb);
     const subscribeProposalOpenContract = (contract_id = null, cb) =>
@@ -262,8 +221,8 @@ const BinarySocketBase = (() => {
         wait,
         availability,
         hasReadyState,
-        isSiteDown,
-        isSiteUpdating,
+        isSiteDown: status => /^down$/i.test(status),
+        isSiteUpdating: status => /^updating$/i.test(status),
         clear: () => {},
         sendBuffered: () => {},
         getSocket: () => binary_socket,
@@ -284,8 +243,6 @@ const BinarySocketBase = (() => {
             }
         },
         removeOnDisconnect: () => { delete config.onDisconnect; },
-        cache: delegateToObject({}, () => deriv_api?.cache),
-        storage: delegateToObject({}, () => deriv_api?.storage),
         blockRequest,
         buy,
         buyAndSubscribe,
@@ -332,6 +289,7 @@ const BinarySocketBase = (() => {
         tradingServers,
         tradingPlatformNewAccount,
         triggerMt5DryRun,
+        getPhoneSettings,
         getServiceToken,
         changeEmail,
         setWSUrl,
@@ -340,47 +298,23 @@ const BinarySocketBase = (() => {
     };
 })();
 
-function delegateToObject(base_obj, extending_obj_getter) {
-    return new Proxy(base_obj, {
-        get(target, field) {
-            if (field === 'default') return target;
-            if (target[field]) return target[field];
-
-            const extending_obj = typeof extending_obj_getter === 'function' ? extending_obj_getter() : extending_obj_getter;
-            if (!extending_obj) return undefined;
-
-            const value = extending_obj[field];
-            if (value) {
-                if (typeof value === 'function') {
-                    return value.bind(extending_obj);
-                }
-                return value;
-            }
-            return undefined;
-        },
-    });
-}
-
-const proxied_socket_base = delegateToObject(BinarySocketBase, () => BinarySocketBase.get());
-
-const proxyForAuthorize = obj =>
-    new Proxy(obj, {
-        get(target, field) {
-            if (field === 'default') return target;
-            if (target[field] && typeof target[field] !== 'function') {
-                return proxyForAuthorize(target[field]);
-            }
-            return (...args) => {
-                const current_ws_url = BinarySocketBase.getWSUrl?.();
-                if (current_ws_url && current_ws_url !== BinarySocketBase.getPublicWSUrl?.()) {
-                    return BinarySocketBase?.wait('balance')?.then(() => target[field](...args));
-                }
-                return target[field](...args);
-            };
-        },
-    });
-
-BinarySocketBase.authorized = proxyForAuthorize(proxied_socket_base);
+const proxied_socket_base = new Proxy(BinarySocketBase, {
+    get(target, field) {
+        if (field === '__esModule' || field === 'default' || field === 'BinarySocket') {
+            return target;
+        }
+        if (target[field]) {
+            const val = target[field];
+            return typeof val === 'function' ? val.bind(target) : val;
+        }
+        const api = BinarySocketBase.get?.();
+        if (api && api[field]) {
+            const val = api[field];
+            return typeof val === 'function' ? val.bind(api) : val;
+        }
+        return undefined;
+    }
+});
 
 proxied_socket_base.default = proxied_socket_base;
 proxied_socket_base.BinarySocket = proxied_socket_base;
