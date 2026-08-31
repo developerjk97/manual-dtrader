@@ -183,13 +183,12 @@ const BinarySocketBase = (() => {
     const setFinancialAndTradingAssessment = payload => deriv_api.send({ set_financial_assessment: 1, ...payload });
     const profitTable = (limit, offset, date_boundaries) =>
         deriv_api.send({ profit_table: 1, description: 1, limit, offset, ...date_boundaries });
-    const statement = (limit, offset, other_properties) =>
-        deriv_api.send({ statement: 1, description: 1, limit, offset, ...other_properties });
+    const statement = (limit, offset, other_properties) => deriv_api.send({ statement: 1, description: 1, limit, offset, ...other_properties });
     const tradingPlatformPasswordChange = payload => deriv_api.send({ trading_platform_password_change: 1, ...payload });
     const tradingPlatformInvestorPasswordChange = payload => deriv_api.send({ trading_platform_investor_password_change: 1, ...payload });
     const tradingPlatformInvestorPasswordReset = payload => deriv_api.send({ trading_platform_investor_password_reset: 1, ...payload });
     const tradingPlatformPasswordReset = payload => deriv_api.send({ trading_platform_password_reset: 1, ...payload });
-    const tradingPlatformAvailableAccounts = platform => deriv_api.send({ trading_platform_available_accounts: 1, platform });
+    const tradingPlatformAvailableAccounts = platform => deriv_api.send({ platform, trading_servers: 1 });
     const paymentAgentList = (country, currency) => deriv_api.send({ paymentagent_list: country, ...(currency && { currency }) });
     const allPaymentAgentList = country => deriv_api.send({ paymentagent_list: country });
     const paymentAgentDetails = (passthrough, req_id) => deriv_api.send({ paymentagent_details: 1, passthrough, req_id });
@@ -209,7 +208,7 @@ const BinarySocketBase = (() => {
     const accountStatistics = () => deriv_api.send({ account_statistics: 1 });
     const tradingServers = platform => deriv_api.send({ platform, trading_servers: 1 });
     const tradingPlatformNewAccount = values => deriv_api.send({ trading_platform_new_account: 1, ...values });
-    const triggerMt5DryRun = ({ email }) => deriv_api.send({ account_type: 'financial', dry_run: 1, email, leverage: 100, mainPassword: 'Test1234', mt5_account_type: 'financial_stp', mt5_new_account: 1, name: 'test real labuan financial stp' });
+    const triggerMt5DryRun = ({ email }) => deriv_api.send({ account_type: 'financial', dry_run: 1, email, leverage: 100, mainPassword: 'Test1234', mt5_account_type: 'financial_stp', mt5_new_acco[...] });
     const getPhoneSettings = () => deriv_api.send({ phone_settings: 1 });
     const getServiceToken = (platform, server) => deriv_api.send({ service_token: 1, service: platform, server });
     const changeEmail = api_request => deriv_api.send(api_request);
@@ -318,6 +317,15 @@ const proxied_socket_base = new Proxy(BinarySocketBase, {
 
 proxied_socket_base.default = proxied_socket_base;
 proxied_socket_base.BinarySocket = proxied_socket_base;
+
+// Ensure the socket is available globally in browser builds and in runtimes where code expects a window global.
+if (typeof window !== 'undefined' && !window.BinarySocket) {
+    try {
+        window.BinarySocket = proxied_socket_base;
+    } catch (e) {
+        // noop - defensive: some environments lock window or disallow assignment
+    }
+}
 
 export const BinarySocket = proxied_socket_base;
 export default proxied_socket_base;
